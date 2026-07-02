@@ -79,6 +79,7 @@ add_clang_library(clangDriver
   ToolChains/Managarm.cpp
   ToolChains/MipsLinux.cpp
   ToolChains/MinGW.cpp
+  ToolChains/Motor.cpp
   ToolChains/MSP430.cpp
   ToolChains/MSVC.cpp
   ToolChains/NetBSD.cpp
