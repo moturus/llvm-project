@@ -23,7 +23,11 @@
 #include <stdlib.h>
 
 #if defined(_LIBCPP_USING_GETENTROPY)
-#  include <sys/random.h>
+#  if __has_include(<sys/random.h>)
+#    include <sys/random.h>
+#  else
+#    include <unistd.h> // POSIX.1-2024 home of getentropy (e.g. mlibc)
+#  endif
 #elif defined(_LIBCPP_USING_DEV_RANDOM)
 #  include <fcntl.h>
 #  include <unistd.h>

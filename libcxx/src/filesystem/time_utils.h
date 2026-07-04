@@ -302,6 +302,9 @@ inline TimeSpec extract_atime(StatT const& st) { return st.st_atim; }
 #if _LIBCPP_HAS_FILESYSTEM
 
 #  if !defined(_LIBCPP_WIN32API)
+#    if !defined(_LIBCPP_USE_UTIMENSAT)
+// Only compiled when actually used: some libcs (e.g. mlibc) provide
+// utimensat but not the legacy ::utimes.
 inline bool posix_utimes(const path& p, std::array<TimeSpec, 2> const& TS, error_code& ec) {
   TimeVal ConvertedTS[2] = {make_timeval(TS[0]), make_timeval(TS[1])};
   if (::utimes(p.c_str(), ConvertedTS) == -1) {
@@ -310,6 +313,7 @@ inline bool posix_utimes(const path& p, std::array<TimeSpec, 2> const& TS, error
   }
   return false;
 }
+#    endif // !defined(_LIBCPP_USE_UTIMENSAT)
 
 #    if defined(_LIBCPP_USE_UTIMENSAT)
 inline bool posix_utimensat(const path& p, std::array<TimeSpec, 2> const& TS, error_code& ec) {

@@ -122,7 +122,9 @@
 #    include <__locale_dir/support/fuchsia.h>
 #  elif _LIBCPP_LIBC_LLVM_LIBC
 #    include <__locale_dir/support/llvm_libc.h>
-#  elif defined(__linux__)
+#  elif defined(__linux__) || defined(__motor__)
+    // Motor OS uses mlibc, which provides the POSIX-2008 + glibc-style locale
+    // surface this header expects (it is mlibc's native path on Linux, too).
 #    include <__locale_dir/support/linux.h>
 #  elif _LIBCPP_LIBC_NEWLIB
 #    include <__locale_dir/support/newlib.h>
