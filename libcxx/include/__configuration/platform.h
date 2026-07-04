@@ -90,7 +90,7 @@
 //      constructor *must* be "/dev/urandom" -- anything else is an error.
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
 #  define _LIBCPP_USING_ARC4_RANDOM
-#elif defined(__wasi__) || defined(__EMSCRIPTEN__)
+#elif defined(__wasi__) || defined(__EMSCRIPTEN__) || defined(__motor__)
 #  define _LIBCPP_USING_GETENTROPY
 #elif defined(__Fuchsia__)
 #  define _LIBCPP_USING_FUCHSIA_CPRNG
@@ -197,7 +197,7 @@
 #endif
 
 #if defined(__BIONIC__) || defined(__NuttX__) || defined(__Fuchsia__) || defined(__wasi__) || _LIBCPP_HAS_MUSL_LIBC || \
-    defined(__OpenBSD__) || _LIBCPP_LIBC_LLVM_LIBC
+    defined(__OpenBSD__) || _LIBCPP_LIBC_LLVM_LIBC || defined(__motor__)
 #  define _LIBCPP_PROVIDES_DEFAULT_RUNE_TABLE
 #endif
 
