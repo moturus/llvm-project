@@ -12,7 +12,19 @@ include(CheckCompilerVersion)
 include(CheckProblematicConfigurations)
 include(HandleLLVMStdlib)
 
-if (ANDROID OR CYGWIN OR CMAKE_SYSTEM_NAME MATCHES "AIX|DragonFly|FreeBSD|Haiku|Linux|NetBSD|OpenBSD|SunOS")
+if (CMAKE_C_COMPILER_TARGET MATCHES "motor" OR CMAKE_CXX_COMPILER_TARGET MATCHES "motor")
+  # Motor OS cross builds use CMAKE_SYSTEM_NAME=Linux (to get LLVM_ON_UNIX
+  # and the Unix/*.inc implementations) but link mlibc, which does not ship
+  # the full Linux header set — probe instead of assuming, like the generic
+  # branch below.
+  check_include_file(mach/mach.h HAVE_MACH_MACH_H)
+  check_include_file(malloc/malloc.h HAVE_MALLOC_MALLOC_H)
+  check_include_file(pthread.h HAVE_PTHREAD_H)
+  check_include_file(sys/mman.h HAVE_SYS_MMAN_H)
+  check_include_file(sysexits.h HAVE_SYSEXITS_H)
+  check_include_file(unistd.h HAVE_UNISTD_H)
+  check_include_file(sys/ioctl.h HAVE_SYS_IOCTL_H)
+elseif (ANDROID OR CYGWIN OR CMAKE_SYSTEM_NAME MATCHES "AIX|DragonFly|FreeBSD|Haiku|Linux|NetBSD|OpenBSD|SunOS")
   set(HAVE_MACH_MACH_H 0)
   set(HAVE_MALLOC_MALLOC_H 0)
   set(HAVE_PTHREAD_H 1)

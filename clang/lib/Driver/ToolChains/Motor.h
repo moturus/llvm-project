@@ -6,6 +6,25 @@
 
 namespace clang {
 namespace driver {
+namespace tools {
+namespace motor {
+
+class LLVM_LIBRARY_VISIBILITY Linker final : public Tool {
+public:
+  Linker(const ToolChain &TC) : Tool("motor::Linker", "ld.lld", TC) {}
+
+  bool hasIntegratedCPP() const override { return false; }
+  bool isLinkJob() const override { return true; }
+
+  void ConstructJob(Compilation &C, const JobAction &JA,
+                    const InputInfo &Output, const InputInfoList &Inputs,
+                    const llvm::opt::ArgList &TCArgs,
+                    const char *LinkingOutput) const override;
+};
+
+} // namespace motor
+} // namespace tools
+
 namespace toolchains {
 
 class LLVM_LIBRARY_VISIBILITY Motor : public Generic_ELF {
@@ -28,6 +47,13 @@ public:
     return ToolChain::CST_Libcxx;
   }
 
+  void
+  AddClangSystemIncludeArgs(const llvm::opt::ArgList &DriverArgs,
+                            llvm::opt::ArgStringList &CC1Args) const override;
+  void AddClangCXXStdlibIncludeArgs(
+      const llvm::opt::ArgList &DriverArgs,
+      llvm::opt::ArgStringList &CC1Args) const override;
+
 protected:
   Tool *buildLinker() const override;
 };
@@ -37,4 +63,3 @@ protected:
 } // namespace clang
 
 #endif
-
