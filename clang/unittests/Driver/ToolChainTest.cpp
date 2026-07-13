@@ -544,6 +544,41 @@ TEST(ToolChainTest, CommandOutput) {
   EXPECT_EQ("a.out", ExeFile);
 }
 
+TEST(ToolChainTest, MotorMulticallLinkerResponseFile) {
+  DiagnosticOptions DiagOpts;
+  IntrusiveRefCntPtr<DiagnosticIDs> DiagID = DiagnosticIDs::create();
+  struct TestDiagnosticConsumer : public DiagnosticConsumer {};
+  DiagnosticsEngine Diags(DiagID, DiagOpts, new TestDiagnosticConsumer);
+  auto InMemoryFileSystem =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+
+  Driver CCDriver("/home/test/bin/llvm", "x86_64-unknown-motor", Diags,
+                  "clang LLVM compiler", InMemoryFileSystem);
+  CCDriver.setCheckInputsExist(false);
+  std::unique_ptr<Compilation> CC(CCDriver.BuildCompilation(
+      {"/home/test/bin/llvm", "--no-default-config", "-nostdlib", "foo.c"}));
+  ASSERT_TRUE(CC);
+
+  auto &CmdLink = CC->getJobs().getJobs().back();
+  CmdLink->setResponseFile("response.txt");
+  std::string Printed;
+  llvm::raw_string_ostream OS(Printed);
+  CmdLink->Print(OS, "\n", true);
+  OS.flush();
+
+  size_t Selector = Printed.find("\"ld.lld\"");
+  size_t ResponseFlag = Printed.find("\"@response.txt\"");
+  size_t ResponseContents =
+      Printed.find("\n Arguments passed via response file:\n");
+  ASSERT_NE(std::string::npos, Selector);
+  ASSERT_NE(std::string::npos, ResponseFlag);
+  ASSERT_NE(std::string::npos, ResponseContents);
+  EXPECT_LT(Selector, ResponseFlag);
+  EXPECT_LT(ResponseFlag, ResponseContents);
+  EXPECT_EQ(std::string::npos,
+            Printed.find("\"ld.lld\"", ResponseContents));
+}
+
 TEST(ToolChainTest, PostCallback) {
   DiagnosticOptions DiagOpts;
   IntrusiveRefCntPtr<DiagnosticIDs> DiagID = DiagnosticIDs::create();

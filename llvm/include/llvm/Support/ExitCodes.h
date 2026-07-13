@@ -20,7 +20,7 @@
 
 #if HAVE_SYSEXITS_H
 #include <sysexits.h>
-#elif __MVS__ || defined(_WIN32)
+#elif __MVS__ || defined(_WIN32) || defined(__motor__)
 // <sysexits.h> does not exist on z/OS and Windows. The only value used in LLVM
 // is EX_IOERR, which is used to signal a special error condition (broken pipe).
 // Define the macro with its usual value from BSD systems, which is chosen to
