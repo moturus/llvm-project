@@ -143,6 +143,8 @@ static void basic_tests()
         assert(ret == win_dir);
 #elif defined(__ANDROID__)
         assert(ret == "/data/local/tmp");
+#elif defined(__motor__)
+        assert(ret == "/user/tmp");
 #else
         assert(ret == "/tmp");
 #endif

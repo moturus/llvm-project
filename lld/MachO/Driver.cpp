@@ -368,7 +368,7 @@ void multiThreadedPageInBackground(DeferredFiles &deferred) {
     totalBytes += buff.size();
     numDeferedFilesAdvised += 1;
 #endif
-#if _WIN32
+#if _WIN32 || defined(__motor__)
     // Reference all file's mmap'd pages to load them into memory.
     for (const char *page = buff.data(), *end = page + buff.size();
          page < end && !pageInQueue.stopAllWork; page += pageSize) {
