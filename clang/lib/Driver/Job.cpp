@@ -135,10 +135,12 @@ void Command::writeResponseFile(raw_ostream &OS) const {
 void Command::buildArgvForResponseFile(
     llvm::SmallVectorImpl<const char *> &Out) const {
   // When not a file list, all arguments are sent to the response file.
-  // This leaves us to set the argv to a single parameter, requesting the tool
-  // to read the response file.
+  // This leaves us to request that the tool read the response file, while
+  // preserving any selector required by a multicall executable.
   if (ResponseSupport.ResponseKind != ResponseFileSupport::RF_FileList) {
     Out.push_back(Executable);
+    if (PrependArg)
+      Out.push_back(PrependArg);
     Out.push_back(ResponseFileFlag.c_str());
     return;
   }

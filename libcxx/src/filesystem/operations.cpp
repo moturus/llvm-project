@@ -1021,6 +1021,8 @@ path __temp_directory_path(error_code* ec) {
   if (ret == nullptr) {
 #  if defined(__ANDROID__)
     ret = "/data/local/tmp";
+#  elif defined(__motor__)
+    ret = "/user/tmp";
 #  else
     ret = "/tmp";
 #  endif
