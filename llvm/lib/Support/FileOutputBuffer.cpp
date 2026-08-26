@@ -27,13 +27,27 @@ using namespace llvm;
 using namespace llvm::sys;
 
 namespace {
+#ifdef __motor__
+static Error finalizeExecutable(int FD, bool Executable) {
+  if (!Executable)
+    return Error::success();
+  if (auto EC = fs::setPermissions(FD, fs::all_read | fs::all_exe))
+    return errorCodeToError(EC);
+  return Error::success();
+}
+#else
+static Error finalizeExecutable(int, bool) { return Error::success(); }
+#endif
+
 // A FileOutputBuffer which creates a temporary file in the same directory
 // as the final output file. The final output file is atomically replaced
 // with the temporary file on commit().
 class OnDiskBuffer : public FileOutputBuffer {
 public:
-  OnDiskBuffer(StringRef Path, fs::TempFile Temp, fs::mapped_file_region Buf)
-      : FileOutputBuffer(Path), Buffer(std::move(Buf)), Temp(std::move(Temp)) {}
+  OnDiskBuffer(StringRef Path, fs::TempFile Temp, fs::mapped_file_region Buf,
+               bool Executable)
+      : FileOutputBuffer(Path), Buffer(std::move(Buf)), Temp(std::move(Temp)),
+        Executable(Executable) {}
 
   uint8_t *getBufferStart() const override { return (uint8_t *)Buffer.data(); }
 
@@ -48,6 +62,9 @@ public:
 
     // Unmap buffer, letting OS flush dirty pages to file on disk.
     Buffer.unmap();
+
+    if (Error E = finalizeExecutable(Temp.FD, Executable))
+      return E;
 
     // Atomically replace the existing file with the new one.
     return Temp.keep(FinalPath);
@@ -69,6 +86,7 @@ public:
 private:
   fs::mapped_file_region Buffer;
   fs::TempFile Temp;
+  bool Executable;
 };
 
 // A FileOutputBuffer which keeps data in memory and writes to the final
@@ -76,9 +94,9 @@ private:
 class InMemoryBuffer : public FileOutputBuffer {
 public:
   InMemoryBuffer(StringRef Path, MemoryBlock Buf, std::size_t BufSize,
-                 unsigned Mode)
+                 unsigned Mode, bool Executable)
       : FileOutputBuffer(Path), Buffer(Buf), BufferSize(BufSize),
-        Mode(Mode) {}
+        Mode(Mode), Executable(Executable) {}
 
   uint8_t *getBufferStart() const override { return (uint8_t *)Buffer.base(); }
 
@@ -103,6 +121,14 @@ public:
       return errorCodeToError(EC);
     raw_fd_ostream OS(FD, /*shouldClose=*/true, /*unbuffered=*/true);
     OS << StringRef((const char *)Buffer.base(), BufferSize);
+    OS.flush();
+    if (OS.has_error()) {
+      std::error_code WriteError = OS.error();
+      OS.clear_error();
+      return errorCodeToError(WriteError);
+    }
+    if (Error E = finalizeExecutable(FD, Executable))
+      return E;
     return Error::success();
   }
 
@@ -111,21 +137,24 @@ private:
   OwningMemoryBlock Buffer;
   size_t BufferSize;
   unsigned Mode;
+  bool Executable;
 };
 } // namespace
 
 static Expected<std::unique_ptr<InMemoryBuffer>>
-createInMemoryBuffer(StringRef Path, size_t Size, unsigned Mode) {
+createInMemoryBuffer(StringRef Path, size_t Size, unsigned Mode,
+                     bool Executable) {
   std::error_code EC;
   MemoryBlock MB = Memory::allocateMappedMemory(
       Size, nullptr, sys::Memory::MF_READ | sys::Memory::MF_WRITE, EC);
   if (EC)
     return errorCodeToError(EC);
-  return std::make_unique<InMemoryBuffer>(Path, MB, Size, Mode);
+  return std::make_unique<InMemoryBuffer>(Path, MB, Size, Mode, Executable);
 }
 
 static Expected<std::unique_ptr<FileOutputBuffer>>
-createOnDiskBuffer(StringRef Path, size_t Size, unsigned Mode) {
+createOnDiskBuffer(StringRef Path, size_t Size, unsigned Mode,
+                   bool Executable) {
   Expected<fs::TempFile> FileOrErr =
       fs::TempFile::create(Path + ".tmp%%%%%%%", Mode);
   if (!FileOrErr)
@@ -147,11 +176,11 @@ createOnDiskBuffer(StringRef Path, size_t Size, unsigned Mode) {
   // If that happens, we fall back to in-memory buffer as the last resort.
   if (EC) {
     consumeError(File.discard());
-    return createInMemoryBuffer(Path, Size, Mode);
+    return createInMemoryBuffer(Path, Size, Mode, Executable);
   }
 
   return std::make_unique<OnDiskBuffer>(Path, std::move(File),
-                                         std::move(MappedFile));
+                                         std::move(MappedFile), Executable);
 }
 
 // Create an instance of FileOutputBuffer.
@@ -159,15 +188,17 @@ Expected<std::unique_ptr<FileOutputBuffer>>
 FileOutputBuffer::create(StringRef Path, size_t Size, unsigned Flags) {
   // Handle "-" as stdout just like llvm::raw_ostream does.
   if (Path == "-")
-    return createInMemoryBuffer("-", Size, /*Mode=*/0);
+    return createInMemoryBuffer("-", Size, /*Mode=*/0,
+                                /*Executable=*/false);
 
   unsigned Mode = fs::all_read | fs::all_write;
-  if (Flags & F_executable)
+  bool Executable = Flags & F_executable;
+  if (Executable)
     Mode |= fs::all_exe;
 
   // If Size is zero, don't use mmap which will fail with EINVAL.
   if (Size == 0)
-    return createInMemoryBuffer(Path, Size, Mode);
+    return createInMemoryBuffer(Path, Size, Mode, Executable);
 
   fs::file_status Stat;
   fs::status(Path, Stat);
@@ -187,10 +218,10 @@ FileOutputBuffer::create(StringRef Path, size_t Size, unsigned Flags) {
   case fs::file_type::file_not_found:
   case fs::file_type::status_error:
     if (Flags & F_mmap)
-      return createInMemoryBuffer(Path, Size, Mode);
+      return createInMemoryBuffer(Path, Size, Mode, Executable);
     else
-      return createOnDiskBuffer(Path, Size, Mode);
+      return createOnDiskBuffer(Path, Size, Mode, Executable);
   default:
-    return createInMemoryBuffer(Path, Size, Mode);
+    return createInMemoryBuffer(Path, Size, Mode, Executable);
   }
 }
